@@ -4,6 +4,8 @@ services:
   whatsapp-bot-baileys:
     container_name: whatsapp-bot-baileys
     build: .
+    ports:
+      - "3000:3000"   # expose ke host
     restart: unless-stopped
     volumes:
       - ./auth_info_baileys:/usr/src/app/auth_info_baileys
