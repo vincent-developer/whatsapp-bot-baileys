@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
+import fs from "fs";
 import qrcode from "qrcode-terminal";
+import path from "path";
 import {
   default as makeWASocket,
   useMultiFileAuthState,
@@ -27,32 +29,64 @@ async function startWhatsApp() {
 
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", (update) => {
-    const { connection, qr, lastDisconnect } = update;
+// Di bagian connection.update handler:
+sock.ev.on("connection.update", (update) => {
+  const { connection, qr, lastDisconnect } = update;
 
-    if (qr) {
-      console.log("\n📌 Scan this WhatsApp QR Code:\n");
-      qrcode.generate(qr, { small: true });
-    }
+  if (qr) {
+    console.log("\n📌 Scan this WhatsApp QR Code:\n");
+    qrcode.generate(qr, { small: true });
+  }
 
-    if (connection === "open") {
-      console.log("🚀 WhatsApp Connected!");
-      waReady = true;
-    }
+  if (connection === "open") {
+    console.log("🚀 WhatsApp Connected!");
+    waReady = true;
+  }
 
-    if (connection === "close") {
-      const reason = lastDisconnect?.error?.output?.statusCode;
-      console.log("⚠ Connection closed:", reason);
+  if (connection === "close") {
+    const reason = lastDisconnect?.error?.output?.statusCode;
+    console.log("⚠ Connection closed. Reason code:", reason);
+    
+    waReady = false; // Set ke false dulu
 
-      if (reason !== DisconnectReason.loggedOut) {
-        console.log("🔄 Reconnecting...");
-        startWhatsApp();
-      } else {
-        console.log("❌ Session expired — delete `auth` folder and scan again.");
-        waReady = false;
+    if (reason === DisconnectReason.loggedOut) {
+      console.log("❌ Session expired (logged out from another device)");
+      console.log("🗑️ Cleaning up auth folder...");
+      
+      // Cleanup socket
+      if (sock) {
+        sock.ev.removeAllListeners();
+        sock = null;
       }
+      
+      // Hapus folder auth otomatis
+      deleteAuthFolder();
+      
+      console.log("📱 Please restart the server and scan QR code again");
+      
+      // Optional: auto-restart after cleanup
+      setTimeout(() => {
+        console.log("🔄 Auto-restarting...");
+        startWhatsApp();
+      }, 2000);
+      
+    } else {
+      // Disconnect karena alasan lain (network, restart, dll)
+      console.log("🔄 Attempting to reconnect...");
+      setTimeout(() => startWhatsApp(), 3000);
     }
-  });
+  }
+});
+
+
+
+// Fungsi helper untuk menghapus folder auth
+function deleteAuthFolder() {
+  const authPath = path.join(process.cwd(), "auth");
+  if (fs.existsSync(authPath)) {
+    fs.rmSync(authPath, { recursive: true, force: true });
+    console.log("🗑️ Auth folder deleted successfully");
+  }
 }
 
 // ---------- API ENDPOINTS ----------
