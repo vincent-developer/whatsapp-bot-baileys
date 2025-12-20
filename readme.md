@@ -1,28 +1,63 @@
-# WhatsApp Messaging API (Baileys + Express)
+# WhatsApp Messaging API
 
-This project provides a simple REST API to send WhatsApp messages using **@whiskeysockets/baileys**.  
-The server supports QR login, persistent authentication, and message sending through HTTP calls.
+**(Baileys + Express + Bearer Token)**
+
+A simple REST API for sending WhatsApp messages using **@whiskeysockets/baileys**.
+Supports QR-based login, persistent sessions, auto-reconnect, and API authentication via **Bearer Token**.
 
 ---
 
 ## 🚀 Features
 
-- QR-based WhatsApp authentication
-- Persistent session using Baileys Multi-File Auth
-- Auto-reconnect on disconnect (except logged-out cases)
-- REST API for sending text messages
-- Built-in error handling and validation
+* QR-based WhatsApp authentication
+* Persistent session using Baileys multi-file auth
+* Auto-reconnect on disconnect (except logged-out cases)
+* REST API for sending WhatsApp text messages
+* Bearer Token authentication
+* Configurable port via `.env`
+* Ready for Docker & Docker Compose deployment
 
 ---
 
 ## 📦 Requirements
 
-- **Node.js 22+**
-- **npm**
+* **Node.js 22+**
+* **npm**
+* (Optional) **Docker & Docker Compose**
 
 ---
 
-## 🛠 Installation
+## 📁 Project Structure (Simplified)
+
+```
+.
+├── auth_info_baileys/   # Persistent WhatsApp session
+├── server.js
+├── Dockerfile
+├── docker-compose.yml
+├── .env
+└── package.json
+```
+
+---
+
+## 🔐 Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+PORT=3000
+API_BEARER_TOKEN=your_secret_bearer_token
+```
+
+| Variable           | Required | Description                         |
+| ------------------ | -------- | ----------------------------------- |
+| `PORT`             | No       | Server port (default: 3000)         |
+| `API_BEARER_TOKEN` | Yes      | Bearer token for API authentication |
+
+---
+
+## 🛠 Installation (Local)
 
 Install dependencies:
 
@@ -32,42 +67,46 @@ npm install
 
 ---
 
-## ▶️ Run the Server
-
-Start the WhatsApp API server:
+## ▶️ Run the Server (Local)
 
 ```bash
 node server.js
 ```
 
-After starting, a QR code will appear in the terminal.
+When the server starts, a QR code will appear in the terminal.
 
-**Scan it using:**
+**Scan via:**
 
-📱 **WhatsApp → Linked Devices → Link a Device**
+📱 WhatsApp → **Linked Devices** → **Link a Device**
 
-Once connected, you will see:
-
-```
-🚀 WhatsApp Connected!
-```
-
-If the connection drops, the script will attempt to reconnect automatically.
-
-If WhatsApp logs out the session entirely, you'll see:
+If successful:
 
 ```
-❌ Session expired — delete `auth` folder and scan again.
+✅ WhatsApp connected
 ```
+
+---
+
+## 🐳 Run with Docker Compose (Recommended)
+
+```bash
+docker compose up -d
+```
+
+* Port follows the value in `.env`
+* WhatsApp session is persisted in `auth_info_baileys/`
+* No image rebuild required when changing `.env`
 
 ---
 
 ## 📡 API Endpoints
 
 ### 🏥 GET `/status`
-Checks the WhatsApp connection state.
 
-**Example Response:**
+Health check endpoint to verify WhatsApp connection status.
+
+**Response:**
+
 ```json
 {
   "connected": true,
@@ -76,17 +115,28 @@ Checks the WhatsApp connection state.
 }
 ```
 
+---
+
 ### ✉️ POST `/send-message`
-Sends a WhatsApp text message.
 
-**Required JSON Payload:**
+Send a WhatsApp text message (**Protected Endpoint**).
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `number` | string | Yes | Phone number in digit format (example: `6281234567890`) |
-| `message` | string | Yes | Message content |
+#### Required Headers
+
+```
+Authorization: Bearer <API_BEARER_TOKEN>
+Content-Type: application/json
+```
+
+#### JSON Body
+
+| Field     | Type   | Required | Description                                         |
+| --------- | ------ | -------- | --------------------------------------------------- |
+| `number`  | string | Yes      | WhatsApp number (digits only, e.g. `6281234567890`) |
+| `message` | string | Yes      | Message content                                     |
 
 **Example Request:**
+
 ```json
 {
   "number": "6281234567890",
@@ -94,11 +144,11 @@ Sends a WhatsApp text message.
 }
 ```
 
-**Example Success Response:**
+**Success Response:**
+
 ```json
 {
   "success": true,
-  "message": "Message successfully sent.",
   "to": "6281234567890",
   "text": "Hello from the API!"
 }
@@ -108,33 +158,39 @@ Sends a WhatsApp text message.
 
 ## ⚠️ Error Handling
 
-The server includes detailed error responses:
-
-| Error Scenario | Status Code | Response |
-|----------------|-------------|----------|
-| WhatsApp not connected | 503 | `"WhatsApp session is not connected."` |
-| Missing fields (number or message) | 400 | `"Both 'number' and 'message' fields are required."` |
-| Invalid phone number format | 400 | `"Phone number must contain only digits (0-9)."` |
-| WhatsApp send failure | 500 | `"Unknown error occurred while sending message."` |
-
-**Console Log Messages:**
-- Connection closed unexpectedly: `"⚠ Connection closed: <reason>"`
-- Session logged out: `"❌ Session expired — delete 'auth' folder and scan again."`
+| Scenario               | Status Code | Message                                  |
+| ---------------------- | ----------- | ---------------------------------------- |
+| Missing token          | 401         | `Access denied. No token provided.`      |
+| Invalid token          | 403         | `Invalid token.`                         |
+| WhatsApp not connected | 503         | `WhatsApp session is not connected.`     |
+| Missing payload fields | 400         | `number and message are required.`       |
+| Invalid phone number   | 400         | `Phone number must contain digits only.` |
+| Message send failure   | 500         | `Failed to send message.`                |
 
 ---
 
 ## 🔄 Session Management
 
-The authentication session is stored inside the `auth/` folder.
+WhatsApp authentication data is stored in:
 
-**If you need to reset the session:**
+```
+auth_info_baileys/
+```
+
+### Reset Session (If Fully Logged Out)
 
 ```bash
-rm -rf auth
+rm -rf auth_info_baileys
+docker compose restart
+```
+
+Or (local):
+
+```bash
 node server.js
 ```
 
-Then scan a new QR code.
+Then scan the QR code again.
 
 ---
 
@@ -142,12 +198,24 @@ Then scan a new QR code.
 
 ```bash
 curl -X POST http://localhost:3000/send-message \
+  -H "Authorization: Bearer your_secret_bearer_token" \
   -H "Content-Type: application/json" \
   -d '{"number":"6281234567890","message":"Hello from the API!"}'
 ```
 
 ---
 
+## 🧠 Notes
+
+* Do **not** commit the `.env` file
+* Do **not** hardcode secrets in source code
+* Use a reverse proxy (Nginx) if you want to expose ports 80/443
+* This is **not** an official WhatsApp API
+
+---
+
 ## 📄 License
 
 MIT License — free for personal or commercial use.
+
+---
