@@ -1,12 +1,15 @@
 import express from "express";
 import cors from "cors";
 import qrcode from "qrcode-terminal";
+import dotenv from "dotenv";
 import {
   default as makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason
 } from "@whiskeysockets/baileys";
+
+dotenv.config();
 
 const app = express();
 app.use(express.json());
@@ -15,6 +18,33 @@ app.use(cors());
 let sock;
 let waReady = false;
 
+/**
+ * Bearer Token Middleware
+ */
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: "Access denied. No token provided."
+    });
+  }
+
+  if (token !== process.env.API_BEARER_TOKEN) {
+    return res.status(403).json({
+      success: false,
+      error: "Invalid token."
+    });
+  }
+
+  next();
+};
+
+/**
+ * WhatsApp Initialization
+ */
 async function startWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
   const { version } = await fetchLatestBaileysVersion();
@@ -31,33 +61,36 @@ async function startWhatsApp() {
     const { connection, qr, lastDisconnect } = update;
 
     if (qr) {
-      console.log("\n📌 Scan this WhatsApp QR Code:\n");
+      console.log("\n📌 Scan WhatsApp QR Code:\n");
       qrcode.generate(qr, { small: true });
     }
 
     if (connection === "open") {
-      console.log("🚀 WhatsApp Connected!");
       waReady = true;
+      console.log("✅ WhatsApp connected");
     }
 
     if (connection === "close") {
+      waReady = false;
+
       const reason = lastDisconnect?.error?.output?.statusCode;
-      console.log("⚠ Connection closed:", reason);
+      console.warn("⚠ WhatsApp connection closed:", reason);
 
       if (reason !== DisconnectReason.loggedOut) {
-        console.log("🔄 Reconnecting...");
+        console.log("🔄 Reconnecting WhatsApp...");
         startWhatsApp();
       } else {
-        console.log("❌ Session expired — delete `auth` folder and scan again.");
-        waReady = false;
+        console.error("❌ Session expired. Delete `auth` folder and re-scan QR.");
       }
     }
   });
 }
 
-// ---------- API ENDPOINTS ----------
+/**
+ * API Routes
+ */
 
-// Health Check
+// Health check (public)
 app.get("/status", (req, res) => {
   res.json({
     connected: waReady,
@@ -66,8 +99,8 @@ app.get("/status", (req, res) => {
   });
 });
 
-// Send message endpoint
-app.post("/send-message", async (req, res) => {
+// Send message (protected)
+app.post("/send-message", authenticateToken, async (req, res) => {
   if (!waReady) {
     return res.status(503).json({
       success: false,
@@ -77,19 +110,17 @@ app.post("/send-message", async (req, res) => {
 
   const { number, message } = req.body;
 
-  // Validate required fields
   if (!number || !message) {
     return res.status(400).json({
       success: false,
-      error: "Both `number` and `message` fields are required."
+      error: "`number` and `message` are required."
     });
   }
 
-  // Ensure number contains only digits
   if (!/^\d+$/.test(number)) {
     return res.status(400).json({
       success: false,
-      error: "Phone number must contain only digits (0-9). No +, -, spaces, or symbols."
+      error: "Phone number must contain digits only."
     });
   }
 
@@ -99,19 +130,33 @@ app.post("/send-message", async (req, res) => {
 
     res.json({
       success: true,
-      message: "Message successfully sent.",
       to: number,
       text: message
     });
-
   } catch (err) {
+    console.error("❌ Failed to send message:", err);
+
     res.status(500).json({
       success: false,
-      error: err?.message || "Unknown error occurred while sending message."
+      error: "Failed to send message."
     });
   }
 });
 
-// Start
+/**
+ * Environment validation
+ */
+if (!process.env.API_BEARER_TOKEN) {
+  console.error("❌ API_BEARER_TOKEN is not set");
+  process.exit(1);
+}
+
+/**
+ * Start server
+ */
+const PORT = process.env.PORT || 3000;
 startWhatsApp();
-app.listen(3000, () => console.log("🌍 WhatsApp API running on port 3000"));
+
+app.listen(PORT, () => {
+  console.log(`🌍 WhatsApp API running on port ${PORT}`);
+});
