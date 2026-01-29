@@ -8,6 +8,8 @@ import {
   fetchLatestBaileysVersion,
   DisconnectReason
 } from "@whiskeysockets/baileys";
+import { setSocketInstance } from "./src/services/whatsappService.js";
+import { handleIncomingMessage } from "./src/handlers/messageHandler.js";
 
 dotenv.config();
 
@@ -46,7 +48,7 @@ const authenticateToken = (req, res, next) => {
  * WhatsApp Initialization
  */
 async function startWhatsApp() {
-  const { state, saveCreds } = await useMultiFileAuthState("./auth");
+  const { state, saveCreds } = await useMultiFileAuthState("./auth_info_baileys");
   const { version } = await fetchLatestBaileysVersion();
 
   sock = makeWASocket({
@@ -55,7 +57,22 @@ async function startWhatsApp() {
     printQRInTerminal: false
   });
 
+  // Set socket instance untuk services
+  setSocketInstance(sock);
+
   sock.ev.on("creds.update", saveCreds);
+
+  // Handle incoming messages
+  sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    if (type === "notify") {
+      for (const message of messages) {
+        // Skip jika message dari diri sendiri
+        if (message.key.fromMe) continue;
+        
+        await handleIncomingMessage(message);
+      }
+    }
+  });
 
   sock.ev.on("connection.update", (update) => {
     const { connection, qr, lastDisconnect } = update;
@@ -80,7 +97,7 @@ async function startWhatsApp() {
         console.log("🔄 Reconnecting WhatsApp...");
         startWhatsApp();
       } else {
-        console.error("❌ Session expired. Delete `auth` folder and re-scan QR.");
+        console.error("❌ Session expired. Delete `auth_info_baileys` folder and re-scan QR.");
       }
     }
   });

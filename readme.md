@@ -1,42 +1,55 @@
-# WhatsApp Messaging API
+# WhatsApp Bot API with Document Converter
 
-**(Baileys + Express + Bearer Token)**
+**(Baileys + Express + Bearer Token + DOCX Generator)**
 
-A simple REST API for sending WhatsApp messages using **@whiskeysockets/baileys**.
-Supports QR-based login, persistent sessions, auto-reconnect, and API authentication via **Bearer Token**.
+A WhatsApp bot that provides REST API for sending messages and an interactive chat feature to convert text messages into Word documents (.docx).
 
 ---
 
 ## 🚀 Features
 
-* QR-based WhatsApp authentication
-* Persistent session using Baileys multi-file auth
-* Auto-reconnect on disconnect (except logged-out cases)
-* REST API for sending WhatsApp text messages
-* Bearer Token authentication
-* Configurable port via `.env`
-* Ready for Docker & Docker Compose deployment
+* **QR-based WhatsApp authentication**
+* **Persistent session** using Baileys multi-file auth
+* **Auto-reconnect** on disconnect (except logged-out cases)
+* **REST API** for sending WhatsApp text messages
+* **Interactive Bot** - Convert text to Word documents via chat
+* **Bearer Token authentication** for API endpoints
+* **Configurable** port via `.env`
+* Ready for **Docker & Docker Compose** deployment
 
 ---
 
 ## 📦 Requirements
 
-* **Node.js 22+**
+* **Node.js 18+**
 * **npm**
 * (Optional) **Docker & Docker Compose**
 
 ---
 
-## 📁 Project Structure (Simplified)
+## 📁 Project Structure
 
 ```
-.
-├── auth_info_baileys/   # Persistent WhatsApp session
+whatsapp-bot/
+├── src/
+│   ├── handlers/
+│   │   └── messageHandler.js
+│   ├── services/
+│   │   ├── docxGenerator.js
+│   │   └── whatsappService.js
+│   └── utils/
+│       ├── constants.js
+│       └── stateManager.js
+├── temp/
+├── auth_info_baileys/
+├── node_modules/
 ├── server.js
-├── Dockerfile
+├── package.json
 ├── docker-compose.yml
+├── Dockerfile
 ├── .env
-└── package.json
+├── .env.example
+└── .gitignore
 ```
 
 ---
@@ -46,34 +59,47 @@ Supports QR-based login, persistent sessions, auto-reconnect, and API authentica
 Create a `.env` file in the project root:
 
 ```env
-PORT=3000
-API_BEARER_TOKEN=your_secret_bearer_token
+PORT=3001
+API_BEARER_TOKEN=your_secret_bearer_token_here
 ```
 
 | Variable           | Required | Description                         |
 | ------------------ | -------- | ----------------------------------- |
-| `PORT`             | No       | Server port (default: 3000)         |
+| `PORT`             | No       | Server port (default: 3001)         |
 | `API_BEARER_TOKEN` | Yes      | Bearer token for API authentication |
+
+**Generate a secure token:**
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
 ---
 
-## 🛠 Installation (Local)
-
-Install dependencies:
+## 🛠 Installation
 
 ```bash
+# Install dependencies
 npm install
 ```
 
 ---
 
-## ▶️ Run the Server (Local)
+## ▶️ Run the Server
+
+### Local Development
 
 ```bash
 node server.js
 ```
 
-When the server starts, a QR code will appear in the terminal.
+### Docker
+
+```bash
+docker-compose up -d
+```
+
+When the server starts, a **QR code** will appear in the terminal/logs.
 
 **Scan via:**
 
@@ -87,15 +113,100 @@ If successful:
 
 ---
 
-## 🐳 Run with Docker Compose (Recommended)
+## 💬 How to Use the Bot
 
-```bash
-docker compose up -d
+### Interactive Text-to-Word Conversion
+
+The bot listens to all incoming WhatsApp messages and provides an interactive way to convert text into Word documents.
+
+#### 📋 Commands
+
+| Command   | Description                              |
+| --------- | ---------------------------------------- |
+| `lcd`     | Start text-to-document conversion        |
+| `cancel`  | Cancel current conversion process        |
+| `help`    | Show help message with usage guide       |
+
+> **Note:** Commands are case-insensitive (`lcd`, `LCD`, `Lcd` all work)
+
+---
+
+### 📝 Conversion Flow
+
+#### Step 1: Start Conversion
+Send `lcd` to the bot
+
+```
+You: lcd
 ```
 
-* Port follows the value in `.env`
-* WhatsApp session is persisted in `auth_info_baileys/`
-* No image rebuild required when changing `.env`
+#### Step 2: Bot Asks for Text
+Bot replies asking you to send the text you want to convert
+
+```
+Bot: Silahkan ketik atau paste text yang ingin diconvert ke dokumen Word:
+```
+
+#### Step 3: Send Your Text
+Send or paste the text you want to convert (supports multi-line text)
+
+```
+You: Judul Dokumen
+
+Lorem Ipsum
+lorem Lorem
+```
+
+#### Step 4: Receive Document
+Bot processes and sends back a `.docx` file
+
+```
+Bot: Sedang memproses dokumen Anda... ⏳
+Bot: 📄 [sends converted_document.docx]
+Bot: Dokumen berhasil dibuat! 📄
+```
+
+---
+
+### ✨ Features
+
+* ✅ **Preserves line breaks** - Your text formatting is maintained
+* ✅ **Multi-line support** - Send paragraphs, poems, lyrics, etc.
+* ✅ **Auto-cleanup** - Temporary files are deleted after sending
+* ✅ **Session timeout** - Process auto-cancels after 5 minutes of inactivity
+* ✅ **Cancel anytime** - Type `cancel` to stop the process
+* ✅ **Private only** - Bot only responds to direct messages (not groups)
+
+---
+
+### 🎯 Example Use Cases
+
+**Poetry/Lyrics:**
+```
+You: lcd
+Bot: Silahkan ketik...
+You: [paste song lyrics]
+Bot: [sends .docx file with formatted lyrics]
+```
+
+**Notes/Memo:**
+```
+You: lcd
+Bot: Silahkan ketik...
+You: Meeting notes:
+- Discuss Q1 budget
+- Review project timeline
+- Team assignments
+Bot: [sends .docx file]
+```
+
+**Long Text:**
+```
+You: lcd
+Bot: Silahkan ketik...
+You: [paste essay or article]
+Bot: [sends .docx file]
+```
 
 ---
 
@@ -111,7 +222,7 @@ Health check endpoint to verify WhatsApp connection status.
 {
   "connected": true,
   "whatsapp_status": "READY",
-  "timestamp": "2025-01-01T12:00:00.000Z"
+  "timestamp": "2026-01-29T12:00:00.000Z"
 }
 ```
 
@@ -137,11 +248,11 @@ Content-Type: application/json
 
 **Example Request:**
 
-```json
-{
-  "number": "6281234567890",
-  "message": "Hello from the API!"
-}
+```bash
+curl -X POST http://localhost:3001/send-message \
+  -H "Authorization: Bearer your_token_here" \
+  -H "Content-Type: application/json" \
+  -d '{"number":"6281234567890","message":"Hello from API!"}'
 ```
 
 **Success Response:**
@@ -150,13 +261,15 @@ Content-Type: application/json
 {
   "success": true,
   "to": "6281234567890",
-  "text": "Hello from the API!"
+  "text": "Hello from API!"
 }
 ```
 
 ---
 
 ## ⚠️ Error Handling
+
+### API Errors
 
 | Scenario               | Status Code | Message                                  |
 | ---------------------- | ----------- | ---------------------------------------- |
@@ -166,6 +279,13 @@ Content-Type: application/json
 | Missing payload fields | 400         | `number and message are required.`       |
 | Invalid phone number   | 400         | `Phone number must contain digits only.` |
 | Message send failure   | 500         | `Failed to send message.`                |
+
+### Bot Errors
+
+If document generation fails, the bot will reply:
+```
+Bot: Maaf, terjadi kesalahan. Silahkan coba lagi.
+```
 
 ---
 
@@ -179,14 +299,15 @@ auth_info_baileys/
 
 ### Reset Session (If Fully Logged Out)
 
+**Docker:**
 ```bash
 rm -rf auth_info_baileys
-docker compose restart
+docker-compose restart
 ```
 
-Or (local):
-
+**Local:**
 ```bash
+rm -rf auth_info_baileys
 node server.js
 ```
 
@@ -194,23 +315,47 @@ Then scan the QR code again.
 
 ---
 
-## 🧪 Test via cURL
+## 🧪 Testing
+
+### Test API Endpoints
 
 ```bash
-curl -X POST http://localhost:3000/send-message \
-  -H "Authorization: Bearer your_secret_bearer_token" \
+# Test status
+curl http://localhost:3001/status
+
+# Test send message
+curl -X POST http://localhost:3001/send-message \
+  -H "Authorization: Bearer your_token_here" \
   -H "Content-Type: application/json" \
-  -d '{"number":"6281234567890","message":"Hello from the API!"}'
+  -d '{"number":"6281234567890","message":"Test message"}'
 ```
+
+### Test Interactive Bot
+
+1. Send `lcd` to the bot's WhatsApp number
+2. Bot will reply asking for text
+3. Send any text (try multi-line text)
+4. Receive .docx file
+5. Open the file in Microsoft Word or compatible app
 
 ---
 
-## 🧠 Notes
+## 📝 Notes
 
 * Do **not** commit the `.env` file
-* Do **not** hardcode secrets in source code
-* Use a reverse proxy (Nginx) if you want to expose ports 80/443
+* Do **not** commit `auth_info_baileys/` folder
 * This is **not** an official WhatsApp API
+* Temporary .docx files are auto-deleted after sending
+* Bot only responds to direct messages (not groups)
+* Session timeout: 5 minutes of inactivity
+
+---
+
+## 🔒 Security Recommendations
+
+* Use strong Bearer tokens (32+ characters)
+* Regularly update dependencies
+* Monitor logs for suspicious activity
 
 ---
 
