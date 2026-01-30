@@ -8,7 +8,7 @@ import {
   fetchLatestBaileysVersion,
   DisconnectReason
 } from "@whiskeysockets/baileys";
-import { setSocketInstance } from "./src/services/whatsappService.js";
+import { setSocketInstance, sendTextMessage } from "./src/services/whatsappService.js";
 import { handleIncomingMessage } from "./src/handlers/messageHandler.js";
 
 dotenv.config();
@@ -21,7 +21,7 @@ let sock;
 let waReady = false;
 
 /**
- * Bearer Token Middleware
+ * Bearer Token Middleware for API security
  */
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -45,7 +45,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 /**
- * WhatsApp Initialization
+ * Initialize WhatsApp connection
  */
 async function startWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth_info_baileys");
@@ -57,7 +57,7 @@ async function startWhatsApp() {
     printQRInTerminal: false
   });
 
-  // Set socket instance untuk services
+  // Share socket instance with other services
   setSocketInstance(sock);
 
   sock.ev.on("creds.update", saveCreds);
@@ -66,48 +66,44 @@ async function startWhatsApp() {
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type === "notify") {
       for (const message of messages) {
-        // Skip jika message dari diri sendiri
+        // Ignore self-sent messages
         if (message.key.fromMe) continue;
-        
         await handleIncomingMessage(message);
       }
     }
   });
 
+  // Handle connection lifecycle
   sock.ev.on("connection.update", (update) => {
     const { connection, qr, lastDisconnect } = update;
 
     if (qr) {
-      console.log("\n📌 Scan WhatsApp QR Code:\n");
+      console.log("📌 New QR Code generated. Please scan:");
       qrcode.generate(qr, { small: true });
     }
 
     if (connection === "open") {
       waReady = true;
-      console.log("✅ WhatsApp connected");
+      console.log("✅ WhatsApp connection established");
     }
 
     if (connection === "close") {
       waReady = false;
-
       const reason = lastDisconnect?.error?.output?.statusCode;
-      console.warn("⚠ WhatsApp connection closed:", reason);
-
+      
       if (reason !== DisconnectReason.loggedOut) {
-        console.log("🔄 Reconnecting WhatsApp...");
+        console.log("🔄 Connection lost. Attempting to reconnect...");
         startWhatsApp();
       } else {
-        console.error("❌ Session expired. Delete `auth_info_baileys` folder and re-scan QR.");
+        console.error("❌ Session expired. Please delete 'auth_info_baileys' and re-scan.");
       }
     }
   });
 }
 
 /**
- * API Routes
+ * Public Route: Health Check
  */
-
-// Health check (public)
 app.get("/status", (req, res) => {
   res.json({
     connected: waReady,
@@ -116,7 +112,9 @@ app.get("/status", (req, res) => {
   });
 });
 
-// Send message (protected)
+/**
+ * Protected Route: Send Text Message
+ */
 app.post("/send-message", authenticateToken, async (req, res) => {
   if (!waReady) {
     return res.status(503).json({
@@ -127,10 +125,11 @@ app.post("/send-message", authenticateToken, async (req, res) => {
 
   const { number, message } = req.body;
 
+  // Validate input presence and format
   if (!number || !message) {
     return res.status(400).json({
       success: false,
-      error: "`number` and `message` are required."
+      error: "Number and message are required."
     });
   }
 
@@ -143,7 +142,7 @@ app.post("/send-message", authenticateToken, async (req, res) => {
 
   try {
     const jid = `${number}@s.whatsapp.net`;
-    await sock.sendMessage(jid, { text: message });
+    await sendTextMessage(jid, message);
 
     res.json({
       success: true,
@@ -151,8 +150,7 @@ app.post("/send-message", authenticateToken, async (req, res) => {
       text: message
     });
   } catch (err) {
-    console.error("❌ Failed to send message:", err);
-
+    console.error("❌ Error sending message:", err.message);
     res.status(500).json({
       success: false,
       error: "Failed to send message."
@@ -161,19 +159,16 @@ app.post("/send-message", authenticateToken, async (req, res) => {
 });
 
 /**
- * Environment validation
+ * Bootstrap Application
  */
 if (!process.env.API_BEARER_TOKEN) {
-  console.error("❌ API_BEARER_TOKEN is not set");
+  console.error("❌ API_BEARER_TOKEN is missing in .env file");
   process.exit(1);
 }
 
-/**
- * Start server
- */
 const PORT = process.env.PORT || 3000;
 startWhatsApp();
 
 app.listen(PORT, () => {
-  console.log(`🌍 WhatsApp API running on port ${PORT}`);
+  console.log(`🌍 Server active on port ${PORT}`);
 });
