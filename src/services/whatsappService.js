@@ -6,26 +6,53 @@ export function setSocketInstance(sock) {
   sockInstance = sock;
 }
 
-export async function sendTextMessage(phoneNumber, text) {
-  if (!sockInstance) {
-    throw new Error('WhatsApp socket not initialized');
-  }
+/**
+ * Helper internal untuk format JID agar DRY (Don't Repeat Yourself)
+ */
+function formatJid(target) {
+  if (typeof target !== 'string') throw new Error(`Invalid target type: ${typeof target}`);
+  
+  if (target.includes('@')) return target;
+  if (/^\d+$/.test(target)) return `${target}@s.whatsapp.net`;
+  
+  throw new Error(`Invalid target format: ${target}`);
+}
 
-  const jid = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`;
-  await sockInstance.sendMessage(jid, { text });
+export async function sendTextMessage(target, text) {
+  if (!sockInstance) throw new Error("WhatsApp socket not initialized");
+
+  const jid = formatJid(target);
+
+  try {
+    return await sockInstance.sendMessage(jid, { text });
+  } catch (error) {
+    console.error('❌ Failed to send text message:', error.message);
+    throw error;
+  }
 }
 
 export async function sendDocument(phoneNumber, filepath, caption = '') {
-  if (!sockInstance) {
-    throw new Error('WhatsApp socket not initialized');
+  if (!sockInstance) throw new Error("WhatsApp socket not initialized");
+  
+  if (!fs.existsSync(filepath)) {
+    throw new Error(`File not found: ${filepath}`);
   }
 
-  const jid = phoneNumber.includes('@') ? phoneNumber : `${phoneNumber}@s.whatsapp.net`;
-  
-  await sockInstance.sendMessage(jid, {
-    document: fs.readFileSync(filepath),
-    mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    fileName: 'converted_document.docx',
-    caption: caption
-  });
+  const jid = formatJid(phoneNumber);
+
+  try {
+    const fileBuffer = fs.readFileSync(filepath);
+    
+    const payload = {
+      document: fileBuffer,
+      mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileName: 'document.docx', // Bisa disesuaikan atau ambil dari path
+      caption: caption
+    };
+    
+    return await sockInstance.sendMessage(jid, payload);
+  } catch (error) {
+    console.error('❌ Failed to send document:', error.message);
+    throw error;
+  }
 }
