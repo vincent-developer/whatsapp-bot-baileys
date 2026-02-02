@@ -74,7 +74,8 @@ export async function handleIncomingMessage(message) {
 
     // Default response for unknown commands in IDLE state
     if (currentState === USER_STATE.IDLE) {
-      await sendTextMessage(jid, MESSAGES.WELCOME);
+      //for now disabled because will spam whoever chat on that whatsapp
+      // await sendTextMessage(jid, MESSAGES.WELCOME);
     }
 
   } catch (error) {
