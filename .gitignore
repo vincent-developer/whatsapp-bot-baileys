@@ -75,3 +75,6 @@ web_modules/
 
 # Baileys auth info
 auth_info_baileys/
+
+# Local secrets (Google service account JSON, etc.)
+.secrets/

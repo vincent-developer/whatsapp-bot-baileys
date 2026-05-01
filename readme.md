@@ -13,6 +13,7 @@ A WhatsApp bot that provides REST API for sending messages and an interactive ch
 * **Auto-reconnect** on disconnect (except logged-out cases)
 * **REST API** for sending WhatsApp text messages
 * **Interactive Bot** - Convert text to Word documents via chat
+* **Jadwal Pasdior** - Nearest Mass schedule from Google Sheets (`jadwal` + name queries)
 * **Bearer Token authentication** for API endpoints
 * **Configurable** port via `.env`
 * Ready for **Docker & Docker Compose** deployment
@@ -36,10 +37,13 @@ whatsapp-bot/
 │   │   └── messageHandler.js
 │   ├── services/
 │   │   ├── docxGenerator.js
+│   │   ├── googleSheetsService.js
 │   │   └── whatsappService.js
 │   └── utils/
 │       ├── constants.js
 │       └── stateManager.js
+├── scripts/
+│   └── verify-schedule.mjs
 ├── temp/
 ├── auth_info_baileys/
 ├── node_modules/
@@ -67,6 +71,13 @@ API_BEARER_TOKEN=your_secret_bearer_token_here
 | ------------------ | -------- | ----------------------------------- |
 | `PORT`             | No       | Server port (default: 3001)         |
 | `API_BEARER_TOKEN` | Yes      | Bearer token for API authentication |
+| `GOOGLE_SPREADSHEET_ID` | No* | Google Spreadsheet ID (default set for Pasdior sheet) |
+| `GOOGLE_SHEET_TAB_NAME` | No | Worksheet title (default: `Jadwal Pasdior`) |
+| `GOOGLE_CREDENTIALS_PATH` | No* | Path to service account JSON (default: `.secrets/google_credential.json`) |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | No* | If not using JSON file: service account email |
+| `GOOGLE_PRIVATE_KEY` | No* | If not using JSON file: private key with `\n` newlines |
+
+\*For **jadwal**, you must either place a service account JSON at `.secrets/google_credential.json` (recommended) or set `GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`. Share the spreadsheet with the service account email as **Viewer**.
 
 **Generate a secure token:**
 
@@ -124,10 +135,40 @@ The bot listens to all incoming WhatsApp messages and provides an interactive wa
 | Command   | Description                              |
 | --------- | ---------------------------------------- |
 | `lcd`     | Start text-to-document conversion        |
+| `jadwal`  | Fetch nearest upcoming schedule from Google Sheet |
 | `cancel`  | Cancel current conversion process        |
 | `help`    | Show help message with usage guide       |
 
 > **Note:** Commands are case-insensitive (`lcd`, `LCD`, `Lcd` all work)
+
+---
+
+### 📅 Schedule checker (`jadwal`)
+
+Reads the **Jadwal Pasdior** tab from your Google Spreadsheet (columns **A–K** for schedule rows):
+
+| Col | Meaning |
+| --- | ------- |
+| A | Hari / label (e.g. Minggu, Sabtu) |
+| B | Tanggal Misa (e.g. `1-May-2026`, `25-May-2026`) |
+| C | Waktu |
+| D–E | Optional (Anamnese, Cara Tobat) — shown if filled |
+| F | Koor Wilayah (default) |
+| G | Organis (default) |
+| J | If filled, **replaces** Koor Wilayah (penukaran / jadwal terbaru) |
+| K | If filled, **replaces** Organis |
+
+**Flow**
+
+1. Send `jadwal` — bot replies with the next chronological task(s), then asks for a name query.
+2. Send `Nama tugas kapan?` (optional `?`, case-insensitive) — bot searches **effective** Koor & Organis (J/K when set, else F/G) with substring match and replies in the same format.
+3. Send `cancel` or wait **5 minutes** (session timeout) to exit the query state.
+
+**Verify Sheets without WhatsApp**
+
+```bash
+npm run verify-schedule
+```
 
 ---
 
@@ -343,6 +384,7 @@ curl -X POST http://localhost:3001/send-message \
 ## 📝 Notes
 
 * Do **not** commit the `.env` file
+* Do **not** commit `.secrets/` or service account JSON
 * Do **not** commit `auth_info_baileys/` folder
 * This is **not** an official WhatsApp API
 * Temporary .docx files are auto-deleted after sending
