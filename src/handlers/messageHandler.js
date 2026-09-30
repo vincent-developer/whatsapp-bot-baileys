@@ -96,9 +96,14 @@ export async function handleIncomingMessage(message) {
         return;
       }
 
+      await sendTextMessage(jid, MESSAGES.VERIFIED);
       await sendTextMessage(jid, formatPoMessage(po));
       stateManager.setState(jid, USER_STATE.IDLE);
       return;
+    }
+
+    if (currentState === USER_STATE.IDLE) {
+      await sendTextMessage(jid, MESSAGES.WELCOME);
     }
   } catch (error) {
     console.error("Critical error in handleIncomingMessage:", error.message);

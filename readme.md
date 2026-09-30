@@ -98,13 +98,16 @@ Scan QR via WhatsApp → Linked Devices → Link a Device.
 ### Flow
 
 ```
+You: halo
+Bot: Selamat datang di WA System VKKProgramming ...
 You: po
-Bot: Silahkan masukkan nomor PO:
+Bot: Baik. Silakan kirim nomor PO yang ingin dicek.
 You: 4500012345
-Bot: Verifikasi sebagai vendor PT M*** J***
-     Kirim nomor HP atau email yang terdaftar:
+Bot: PO ditemukan atas nama vendor PT M*** J***
+     Mohon verifikasi dengan HP atau email terdaftar...
 You: 628111000001
-Bot: [detail PO friendly]
+Bot: Verifikasi berhasil. Berikut informasi PO Anda:
+     [detail PO friendly]
 ```
 
 Challenge wajib setiap kali minta PO. Retry bebas jika salah; ketik `cancel` untuk batal.
