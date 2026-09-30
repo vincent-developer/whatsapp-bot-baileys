@@ -1,85 +1,112 @@
 import stateManager from "../utils/stateManager.js";
 import { COMMANDS, USER_STATE, MESSAGES } from "../utils/constants.js";
-import { sendTextMessage, sendDocument } from "../services/whatsappService.js";
-import { generateDocx, cleanupTempFile } from "../services/docxGenerator.js";
+import { sendTextMessage } from "../services/whatsappService.js";
+import { getByNumber, formatPoMessage } from "../services/poService.js";
+import {
+  getByLifnr,
+  maskVendorName,
+  verifyContact
+} from "../services/vendorAuthService.js";
 
 /**
  * Main handler for incoming WhatsApp messages
  */
 export async function handleIncomingMessage(message) {
-  try {
-    const jid = message.key.remoteJid;
+  const jid = message.key.remoteJid;
 
-    // Extract message text from various possible structures
+  try {
     const messageText = (
       message.message?.conversation ||
       message.message?.extendedTextMessage?.text ||
       ""
     ).trim();
 
-    // Ignore messages from groups or broadcast status
     if (jid.includes("@g.us") || jid.includes("@broadcast")) return;
 
-    // Get current user interaction state
     const currentState = stateManager.getState(jid);
     const command = messageText.toLowerCase();
 
-    // --- Global Commands ---
-    
-    // Reset state to IDLE if user cancels
     if (command === COMMANDS.CANCEL) {
       stateManager.setState(jid, USER_STATE.IDLE);
       await sendTextMessage(jid, MESSAGES.CANCELLED);
       return;
     }
 
-    // Show help information
     if (command === COMMANDS.HELP) {
       await sendTextMessage(jid, MESSAGES.HELP);
       return;
     }
 
-    // Initiate conversion flow
-    if (command === COMMANDS.CONVERT) {
-      stateManager.setState(jid, USER_STATE.WAITING_FOR_TEXT);
-      await sendTextMessage(jid, MESSAGES.ASK_TEXT);
+    if (command === COMMANDS.PO) {
+      stateManager.setState(jid, USER_STATE.WAITING_FOR_PO);
+      await sendTextMessage(jid, MESSAGES.ASK_PO_NUMBER);
       return;
     }
 
-    // --- State-based Logic ---
-
-    // Handle input when user is expected to send text for document generation
-    if (currentState === USER_STATE.WAITING_FOR_TEXT) {
-      if (!messageText) {
-        await sendTextMessage(jid, "Text cannot be empty. Please send valid text.");
+    if (currentState === USER_STATE.WAITING_FOR_PO) {
+      if (!/^\d+$/.test(messageText)) {
+        await sendTextMessage(jid, MESSAGES.PO_INVALID);
         return;
       }
 
-      await sendTextMessage(jid, MESSAGES.PROCESSING);
+      const po = await getByNumber(messageText);
 
-      // Generate document from provided text
-      const result = await generateDocx(messageText);
-
-      if (result.success) {
-        await sendDocument(jid, result.filepath, MESSAGES.SUCCESS);
-        cleanupTempFile(result.filepath); // Delete temp file after sending
-      } else {
-        await sendTextMessage(jid, MESSAGES.ERROR);
+      if (!po) {
+        await sendTextMessage(jid, MESSAGES.PO_NOT_FOUND);
+        stateManager.setState(jid, USER_STATE.IDLE);
+        return;
       }
 
-      // Return user to IDLE state after completion
-      stateManager.setState(jid, USER_STATE.IDLE);
+      const vendor = await getByLifnr(po.LIFNR);
+      if (!vendor) {
+        await sendTextMessage(jid, MESSAGES.CHALLENGE_UNAVAILABLE);
+        stateManager.setState(jid, USER_STATE.IDLE);
+        return;
+      }
+
+      stateManager.setState(jid, USER_STATE.WAITING_FOR_CHALLENGE, {
+        ebeln: po.EBELN,
+        lifnr: po.LIFNR
+      });
+
+      const maskedName = maskVendorName(vendor.NAME1 || po.NAME1);
+      await sendTextMessage(jid, MESSAGES.ASK_CHALLENGE(maskedName));
       return;
     }
 
-    // Default response for unknown commands in IDLE state
-    if (currentState === USER_STATE.IDLE) {
-      //for now disabled because will spam whoever chat on that whatsapp
-      // await sendTextMessage(jid, MESSAGES.WELCOME);
-    }
+    if (currentState === USER_STATE.WAITING_FOR_CHALLENGE) {
+      const context = stateManager.getContext(jid);
 
+      if (!context?.ebeln || !context?.lifnr) {
+        stateManager.setState(jid, USER_STATE.IDLE);
+        await sendTextMessage(jid, MESSAGES.PO_NOT_FOUND);
+        return;
+      }
+
+      const isValid = await verifyContact(context.lifnr, messageText);
+      if (!isValid) {
+        await sendTextMessage(jid, MESSAGES.CHALLENGE_FAILED);
+        return;
+      }
+
+      const po = await getByNumber(context.ebeln);
+      if (!po) {
+        stateManager.setState(jid, USER_STATE.IDLE);
+        await sendTextMessage(jid, MESSAGES.PO_NOT_FOUND);
+        return;
+      }
+
+      await sendTextMessage(jid, formatPoMessage(po));
+      stateManager.setState(jid, USER_STATE.IDLE);
+      return;
+    }
   } catch (error) {
-    // Log only critical errors
     console.error("Critical error in handleIncomingMessage:", error.message);
+    try {
+      stateManager.setState(jid, USER_STATE.IDLE);
+      await sendTextMessage(jid, MESSAGES.ERROR);
+    } catch (notifyError) {
+      console.error("Failed to notify user about error:", notifyError.message);
+    }
   }
 }

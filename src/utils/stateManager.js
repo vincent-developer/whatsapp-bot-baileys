@@ -6,27 +6,38 @@ class StateManager {
     this.SESSION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
   }
 
-  getState(phoneNumber) {
-    const state = this.userStates[phoneNumber];
-    
-    // Auto cleanup jika timeout
-    if (state && Date.now() - state.timestamp > this.SESSION_TIMEOUT) {
-      this.setState(phoneNumber, USER_STATE.IDLE);
+  getState(jid) {
+    const entry = this.userStates[jid];
+
+    if (entry && Date.now() - entry.timestamp > this.SESSION_TIMEOUT) {
+      this.setState(jid, USER_STATE.IDLE);
       return USER_STATE.IDLE;
     }
-    
-    return state?.state || USER_STATE.IDLE;
+
+    return entry?.state || USER_STATE.IDLE;
   }
 
-  setState(phoneNumber, newState) {
-    this.userStates[phoneNumber] = {
+  getContext(jid) {
+    const entry = this.userStates[jid];
+
+    if (entry && Date.now() - entry.timestamp > this.SESSION_TIMEOUT) {
+      this.setState(jid, USER_STATE.IDLE);
+      return null;
+    }
+
+    return entry?.context || null;
+  }
+
+  setState(jid, newState, context = null) {
+    this.userStates[jid] = {
       state: newState,
+      context: newState === USER_STATE.IDLE ? null : context,
       timestamp: Date.now()
     };
   }
 
-  clearState(phoneNumber) {
-    delete this.userStates[phoneNumber];
+  clearState(jid) {
+    delete this.userStates[jid];
   }
 
   getAllStates() {

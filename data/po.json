@@ -1,0 +1,44 @@
+[
+  {
+    "EBELN": "4500012345",
+    "BSART": "NB",
+    "BUKRS": "1000",
+    "LIFNR": "0000123456",
+    "NAME1": "PT MAJU JAYA",
+    "EKORG": "1000",
+    "EKGRP": "P01",
+    "BEDAT": "20260915",
+    "FRGKE": "R",
+    "WAERS": "IDR",
+    "RLWRT": "12500000.00",
+    "EINDT": "20261005"
+  },
+  {
+    "EBELN": "4500012346",
+    "BSART": "NB",
+    "BUKRS": "1000",
+    "LIFNR": "0000789012",
+    "NAME1": "CV SUMBER MAKMUR",
+    "EKORG": "1000",
+    "EKGRP": "P02",
+    "BEDAT": "20260920",
+    "FRGKE": "",
+    "WAERS": "IDR",
+    "RLWRT": "8750000.00",
+    "EINDT": "20261012"
+  },
+  {
+    "EBELN": "4500012347",
+    "BSART": "UB",
+    "BUKRS": "2000",
+    "LIFNR": "0000345678",
+    "NAME1": "PT TEKNOLOGI NUSANTARA",
+    "EKORG": "2000",
+    "EKGRP": "P01",
+    "BEDAT": "20260925",
+    "FRGKE": "R",
+    "WAERS": "USD",
+    "RLWRT": "1500.00",
+    "EINDT": "20261101"
+  }
+]
