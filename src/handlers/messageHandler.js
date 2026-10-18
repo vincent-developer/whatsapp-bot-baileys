@@ -2,6 +2,10 @@ import stateManager from "../utils/stateManager.js";
 import { COMMANDS, USER_STATE, MESSAGES } from "../utils/constants.js";
 import { sendTextMessage, sendDocument } from "../services/whatsappService.js";
 import { generateDocx, cleanupTempFile } from "../services/docxGenerator.js";
+import {
+  validateScribdUrl,
+  downloadScribdToTemp,
+} from "../services/scribdService.js";
 
 /**
  * Main handler for incoming WhatsApp messages
@@ -25,7 +29,7 @@ export async function handleIncomingMessage(message) {
     const command = messageText.toLowerCase();
 
     // --- Global Commands ---
-    
+
     // Reset state to IDLE if user cancels
     if (command === COMMANDS.CANCEL) {
       stateManager.setState(jid, USER_STATE.IDLE);
@@ -39,10 +43,17 @@ export async function handleIncomingMessage(message) {
       return;
     }
 
-    // Initiate conversion flow
+    // Initiate LCD conversion flow
     if (command === COMMANDS.CONVERT) {
       stateManager.setState(jid, USER_STATE.WAITING_FOR_TEXT);
       await sendTextMessage(jid, MESSAGES.ASK_TEXT);
+      return;
+    }
+
+    // Initiate Scribd download flow
+    if (command === COMMANDS.SCRIBD) {
+      stateManager.setState(jid, USER_STATE.WAITING_FOR_SCRIBD_URL);
+      await sendTextMessage(jid, MESSAGES.ASK_SCRIBD_URL);
       return;
     }
 
@@ -57,18 +68,46 @@ export async function handleIncomingMessage(message) {
 
       await sendTextMessage(jid, MESSAGES.PROCESSING);
 
-      // Generate document from provided text
       const result = await generateDocx(messageText);
 
-      if (result.success) {
-        await sendDocument(jid, result.filepath, MESSAGES.SUCCESS);
-        cleanupTempFile(result.filepath); // Delete temp file after sending
-      } else {
-        await sendTextMessage(jid, MESSAGES.ERROR);
+      try {
+        if (result.success) {
+          await sendDocument(jid, result.filepath, MESSAGES.SUCCESS);
+        } else {
+          await sendTextMessage(jid, MESSAGES.ERROR);
+        }
+      } finally {
+        if (result.filepath) cleanupTempFile(result.filepath);
+        stateManager.setState(jid, USER_STATE.IDLE);
+      }
+      return;
+    }
+
+    // Handle Scribd URL input
+    if (currentState === USER_STATE.WAITING_FOR_SCRIBD_URL) {
+      if (!messageText || !validateScribdUrl(messageText)) {
+        await sendTextMessage(jid, MESSAGES.INVALID_SCRIBD_URL);
+        return;
       }
 
-      // Return user to IDLE state after completion
-      stateManager.setState(jid, USER_STATE.IDLE);
+      await sendTextMessage(jid, MESSAGES.PROCESSING_SCRIBD);
+
+      let result;
+      try {
+        result = await downloadScribdToTemp(messageText);
+
+        if (result.success) {
+          await sendDocument(jid, result.filepath, MESSAGES.SUCCESS_SCRIBD);
+        } else {
+          await sendTextMessage(jid, MESSAGES.ERROR_SCRIBD);
+        }
+      } catch (error) {
+        console.error("Scribd flow error:", error.message);
+        await sendTextMessage(jid, MESSAGES.ERROR_SCRIBD);
+      } finally {
+        if (result?.filepath) cleanupTempFile(result.filepath);
+        stateManager.setState(jid, USER_STATE.IDLE);
+      }
       return;
     }
 
