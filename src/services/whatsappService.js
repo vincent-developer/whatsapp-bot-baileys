@@ -1,6 +1,26 @@
 import fs from 'fs';
+import path from 'path';
 
 let sockInstance = null;
+
+function documentMetaFromPath(filepath) {
+  const fileName = path.basename(filepath);
+  const ext = path.extname(filepath).toLowerCase();
+
+  if (ext === '.pdf') {
+    return { mimetype: 'application/pdf', fileName };
+  }
+
+  if (ext === '.docx') {
+    return {
+      mimetype:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileName,
+    };
+  }
+
+  return { mimetype: 'application/octet-stream', fileName };
+}
 
 export function setSocketInstance(sock) {
   sockInstance = sock;
@@ -42,11 +62,12 @@ export async function sendDocument(phoneNumber, filepath, caption = '') {
 
   try {
     const fileBuffer = fs.readFileSync(filepath);
-    
+    const { mimetype, fileName } = documentMetaFromPath(filepath);
+
     const payload = {
       document: fileBuffer,
-      mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      fileName: 'document.docx', // Bisa disesuaikan atau ambil dari path
+      mimetype,
+      fileName,
       caption: caption
     };
     

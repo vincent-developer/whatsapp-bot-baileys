@@ -10,11 +10,13 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.10",
-    "express": "^4.21.1",
-    "qrcode-terminal": "^0.12.0",
     "cors": "^2.8.5",
+    "docx": "^8.5.0",
     "dotenv": "^16.4.5",
-    "docx": "^8.5.0"
+    "express": "^4.21.1",
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^25.14.0",
+    "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
