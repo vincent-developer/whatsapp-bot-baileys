@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   whatsapp-bot-baileys:
     container_name: whatsapp-bot-baileys
