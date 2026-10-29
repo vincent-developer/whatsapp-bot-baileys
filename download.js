@@ -700,6 +700,7 @@ export async function downloadScribd(url, outputPath) {
   try {
     console.log('Starting Chrome browser...');
     browser = await puppeteer.launch({
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       headless: HEADLESS_ENABLED ? 'new' : false,
       userDataDir: profileDir,
       protocolTimeout: DEFAULT_CDP_TIMEOUT_SECONDS * 1000,
