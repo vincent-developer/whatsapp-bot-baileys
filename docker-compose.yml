@@ -10,3 +10,9 @@ services:
     volumes:
       - ./auth_info_baileys:/usr/src/app/auth_info_baileys
     tty: true
+    networks:
+      - church-network
+
+networks:
+  church-network:
+    name: church-network
